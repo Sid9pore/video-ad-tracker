@@ -1,0 +1,72 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/streadway/amqp"
+	"github.com/Sid9pore/video-ad-tracker/ads"
+)
+
+// ConsumeClickEvents listens for new messages in RabbitMQ and processes them
+func ConsumeClickEvents() {
+	// Connect to RabbitMQ and open a channel
+	err := initRabbitMQ()
+	if err != nil {
+		log.Fatalf("Error initializing RabbitMQ: %s", err)
+	}
+
+	// Start consuming messages from the queue
+	msgs, err := rabbitCh.Consume(
+		"clicks_queue", // Queue name
+		"",             // Consumer name
+		true,           // Auto ack
+		false,          // Exclusive
+		false,          // No-local
+		false,          // No-wait
+		nil,            // Arguments
+	)
+	if err != nil {
+		log.Fatalf("Failed to start consuming messages: %s", err)
+	}
+
+	// Create a channel to wait for messages
+	forever := make(chan bool)
+
+	go func() {
+		for msg := range msgs {
+			// Unmarshal the click data
+			var clickData ads.ClickData
+			err := json.Unmarshal(msg.Body, &clickData)
+			if err != nil {
+				log.Printf("Failed to unmarshal message: %s", err)
+				continue
+			}
+
+			// Insert the click event into the database (implement this function)
+			err = storeClickEvent(clickData)
+			if err != nil {
+				log.Printf("Failed to store click event: %s", err)
+				// Retry the message in case of failure (optional)
+			} else {
+				log.Printf("Successfully processed click event: %v", clickData)
+			}
+		}
+	}()
+
+	log.Println("Waiting for click events...")
+	<-forever
+}
+
+// storeClickEvent inserts the click event into the PostgreSQL database
+func storeClickEvent(clickData ads.ClickData) error {
+	// Assuming you have a DB connection method and a query for this
+	query := `INSERT INTO clicks (ad_id, timestamp, ip, video_playback_time) VALUES ($1, $2, $3, $4)`
+	_, err := db.Exec(query, clickData.AdID, clickData.Timestamp, clickData.IP, clickData.VideoPlaybackTime)
+	if err != nil {
+		return fmt.Errorf("failed to store click event: %v", err)
+	}
+	return nil
+}
