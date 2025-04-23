@@ -6,25 +6,25 @@ WORKDIR /app
 # Copy go mod and sum files
 COPY go.mod go.sum ./
 
-# Download all modules
+# Download dependencies
 RUN go mod download
 
-# Copy the source code to the container
+# Copy source code
 COPY . .
 
-# Build the application
-RUN go build -o server ./cmd/main.go
+# Build statically linked binary for Alpine
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o server ./cmd/main.go
 
-# Use minimal runtime image
+# Minimal runtime image
 FROM alpine:latest
 
 WORKDIR /root/
 
-# Copy the pre-built binary file from the previous stage
+# Copy binary from builder
 COPY --from=builder /app/server .
 
-# Expose the server port
+# Expose app port
 EXPOSE 8080
 
-# Run the app
+# Run the binary
 CMD ["./server"]

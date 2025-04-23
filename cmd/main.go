@@ -12,12 +12,15 @@ import (
 )
 
 func main() {
-	connStr := "host=localhost port=5432 user=postgres password=Superman dbname=postgres sslmode=disable"
+	log.Println("Connecting to DB")
+	connStr := "host=postgres-server port=5432 user=admin password=myNewP@ssw0rd dbname=videoads sslmode=disable"
+	log.Println(connStr)
 	db, err := ads.InitializeDB(connStr)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
+	log.Println("Connected to DB")
 
 	// Initialize ads repository and service
 	adsRepo := ads.NewPostgresRepository(db)
