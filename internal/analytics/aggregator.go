@@ -27,7 +27,7 @@ func (a *PostgresAggregator) GetClickMetrics(startTime, endTime time.Time) (Clic
 	clickCountQuery := `  
         SELECT COUNT(*)  
         FROM clicks  
-        WHERE click_time >= $1 AND click_time <= $2  
+        WHERE timestamp >= $1 AND timestamp <= $2  
     `
 
 	var totalClicks int64

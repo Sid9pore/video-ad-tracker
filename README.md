@@ -1,135 +1,109 @@
-# 📺 Video Ad Tracker
+Video-ad-tracker
+A lightweight Go service for tracking video ad impressions and clicks, backed by PostgreSQL and instrumented with Prometheus metrics.
 
-A GoLang backend service to manage and track video advertisements. The system logs ad clicks, provides real-time analytics, handles spikes in traffic, and remains resilient under partial failures.
+📦 Features
+Ad Retrieval: Fetch available ads via REST.
 
-## 🚀 Features
+Click Tracking: Record ad click events (/ads/click) with resilience and queuing on DB downtime.
 
-- RESTful API to serve ads and record clicks  
-- Real-time analytics with Redis caching  
-- Asynchronous click processing via message queue  
-- Scalable architecture with Docker  
-- Rate limiting and structured logging  
-- Resilient to DB/service failures  
+Analytics: Aggregate click metrics over time windows (/ads/analytics).
 
-## 📁 Project Structure
+Prometheus Metrics: Expose /metrics endpoint (http_requests_total, Go runtime stats, custom gauges).
 
-├── cmd/ # App entry point
-├── internal/
-│ ├── ads/ # Ad logic and handlers
-│ ├── click/ # Click tracking logic
-│ ├── analytics/ # Metrics aggregation
-│ ├── middleware/ # Rate limiting, logging
-│ └── db/ # DB access, migrations
-├── configs/ # YAML or ENV configs
-├── migrations/ # SQL migration scripts
-├── Dockerfile # Container setup
-├── docker-compose.yml # Service orchestration
-└── README.md
+Dockerized: Run application, PostgreSQL, and Prometheus in separate containers without Docker Compose.
 
+🚀 Quickstart
+Prerequisites
+Docker & Docker Desktop
 
-## 📦 Installation
+Go (for local development)
 
-### 🐳 Docker (Recommended)
+(Optional) PgAdmin / DBeaver for DB inspection
 
+1. Clone & Build
 
-docker-compose up --build
-🔧 Local Setup
-Install Go 1.20+
+git clone https://github.com/Sid9pore/video-ad-tracker.git
+cd video-ad-tracker
+docker build -t video-ad-tracker .
 
-Set up PostgreSQL and Redis
+2. Run Services
 
-Run migrations:
+# Create network
+docker network create video-ad-net
 
+# PostgreSQL (exposed on host port 8084)
+docker run -d --name postgres-server --network video-ad-net \
+  -e POSTGRES_USER=admin -e POSTGRES_PASSWORD=myNewP@ssw0rd \
+  -e POSTGRES_DB=videoads \
+  -v "$(pwd)/migrations:/docker-entrypoint-initdb.d" \
+  -p 8084:5432 \
+  postgres
 
-migrate -path ./migrations -database postgres://user:pass@localhost:5432/ad_tracker up
-Start the server:
+# Application (connects to postgres-server:5432 internally)
+docker run -d --name video-ad-tracker --network video-ad-net \
+  -e DB_CONN="postgres://admin:myNewP@ssw0rd@postgres-server:5432/videoads?sslmode=disable" \
+  -p 8080:8080 \
+  video-ad-tracker
 
+# Prometheus (scrapes video-ad-tracker)
+docker run -d --name prometheus --network video-ad-net \
+  -v "$(pwd)/prometheus.yml:/etc/prometheus/prometheus.yml" \
+  -p 9090:9090 \
+  prom/prometheus
+📑 Configuration
+Environment Variables
 
-go run ./cmd/server
+DB_CONN: PostgreSQL connection string
 
-🔌 API Endpoints
+PORT (optional): HTTP server port (default 8080)
 
-GET /ads
-Returns a list of ad metadata.
+prometheus.yml
 
-json
-[
-  {
-    "id": 1,
-    "image_url": "https://cdn.com/ad1.png",
-    "target_url": "https://example.com/product"
-  }
-]
-POST /ads/click
-Tracks ad click.
+global:
+  scrape_interval: 10s
 
-json
-{
-  "ad_id": 1,
-  "timestamp": "2025-04-21T15:00:00Z",
-  "ip": "203.0.113.1",
-  "video_playback_time": 12
-}
-GET /ads/analytics
-Returns real-time performance metrics per ad.
+scrape_configs:
+  - job_name: 'video-ad-tracker'
+    static_configs:
+      - targets: ['video-ad-tracker:8080']
+🛠️ Development
+Build & Run Locally
 
-json
-Copy
-Edit
-{
-  "ad_id": 1,
-  "clicks": 1200,
-  "ctr": 0.045
-}
-🧱 Database Schema
-See /migrations for full scripts.
+go run cmd/main.go
 
-ads: Stores ad metadata.
+Migrations
 
-clicks: Tracks each user click with playback time and IP.
+Place SQL files in migrations/.
 
-🛡 Resilience & Scalability
-Message queue buffers clicks (Kafka or RabbitMQ)
+They auto-run on first container start.
 
-Redis caches hot analytics for quick access
+Testing Endpoints
 
-Goroutine worker pool for concurrent DB writes
+Click endpoint:
 
-Rate limiter middleware to prevent abuse
+curl -X POST http://localhost:8080/ads/click \
+  -H 'Content-Type: application/json' \
+  -d '{"ad_id":1,"ip":"127.0.0.1","video_playback_time":30}'
 
-Dockerized for horizontal scaling
+Analytics:
 
-📈 Monitoring & Logging
-Structured JSON logs via logrus or zap
+curl -G http://localhost:8080/ads/analytics \
+  --data-urlencode "start=2025-04-20T00:00:00Z" \
+  --data-urlencode "end=2025-04-22T23:59:59Z"
 
-Prometheus metrics endpoint (coming soon)
+Metrics:
 
-🔄 CI/CD Pipeline (Optional)
-To add:
+curl http://localhost:8080/metrics
 
-GitHub Actions or GitLab CI for:
+📊 Monitoring
 
-Linting
+Prometheus UI: http://localhost:9090
 
-Tests
+Grafana (if installed): add Prometheus at http://prometheus:9090
 
-Docker build
+🔒 Security & Resilience
+Click Queue: In-memory buffering with worker retries ensures no data loss during DB downtime.
 
-🧪 Testing
+Graceful Shutdown: Waits for queued events to flush on exit.
 
-go test ./...
-🌐 Contributing
-Fork the repo
-
-Create a new feature branch
-
-Submit a PR with detailed description
-
-📄 License
-MIT
-
-👤 Author
-Sid9pore — GitHub
-
-
-Let me know if you want a separate CONTRIBUTING.md or API Swagger spec!
+Prepared Statements: Prevents SQL injection and improves performance.

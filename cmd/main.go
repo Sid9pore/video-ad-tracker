@@ -39,7 +39,7 @@ func main() {
 	// Ads Handlers
 	adsHandler := ads.NewHandler(adsService)
 	router.HandleFunc("/ads", adsHandler.GetAdsHandler).Methods("GET")
-	router.HandleFunc("/ads/click", adsHandler.LogClickHandler).Methods("POST")
+	go router.HandleFunc("/ads/click", adsHandler.LogClickHandler).Methods("POST")
 
 	// Analytics Handlers
 	analyticsHandler := analytics.NewHandler(analyticsService) // Ensure this function is correctly defined
