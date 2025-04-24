@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 
@@ -33,15 +34,14 @@ func main() {
 		log.Fatalf("rabbit channel: %v", err)
 	}
 	mq.QueueDeclare("clicks_queue", true, false, false, false, nil)
-
-	// Start consumer
-	go startConsumer(mq, db)
-
 	// Initialize ads repository and service
 	adsRepo := ads.NewPostgresRepository(db)
 	adsService := ads.NewService(adsRepo)
 	// Setup service & handler for insert request
-	adsInsertService := ads.NewInsertService(db, mq)
+	adsInsertService := ads.NewInsertService(adsRepo, mq)
+
+	// Start consumer
+	go startConsumer(mq, adsRepo)
 
 	// Initialize analytics repository and service
 	analyticsRepo := analytics.NewPostgresAggregator(db)
@@ -71,4 +71,23 @@ func main() {
 
 	log.Println("Starting server on :8080")
 	log.Fatal(http.ListenAndServe(":8080", router))
+}
+
+func startConsumer(mq *amqp.Channel, repo ads.Repository) {
+	msgs, err := mq.Consume("clicks_queue", "", true, false, false, false, nil)
+	if err != nil {
+		log.Fatalf("consume error: %v", err)
+	}
+	for msg := range msgs {
+		var click ads.ClickData
+		if err := json.Unmarshal(msg.Body, &click); err != nil {
+			log.Printf("unmarshal error: %v", err)
+			continue
+		}
+		// Persist via repo
+		if err := repo.LogClick(click); err != nil {
+			log.Printf("db insert error: %v", err)
+			// Optionally: requeue or dead-letter
+		}
+	}
 }
