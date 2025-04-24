@@ -41,7 +41,7 @@ func (r *PostgresRepository) GetAllAds() ([]Ad, error) {
 
 // LogClick records a click event in the database
 func (r *PostgresRepository) LogClick(click ClickData) error {
-	query := `  
+	const query = `  
         INSERT INTO clicks (ad_id, timestamp, ip, video_playback_time)  
         VALUES ($1, $2, $3, $4)  
     `

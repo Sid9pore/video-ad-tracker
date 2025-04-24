@@ -38,4 +38,6 @@ func (h *Handler) LogClickHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"status":"queued"}`))
 }
