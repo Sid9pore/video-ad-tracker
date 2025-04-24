@@ -4,12 +4,11 @@ import (
 	"encoding/json"
 	"log"
 
-	"your/module/ads"
-
+	"github.com/Sid9pore/video-ad-tracker/ads"
 	"github.com/streadway/amqp"
 )
 
-func startConsumer(mq *amqp.Channel, repo ads.Repository) {
+func startConsumer(mq *amqp.Channel, repo Repository) {
 	msgs, err := mq.Consume("clicks_queue", "", true, false, false, false, nil)
 	if err != nil {
 		log.Fatalf("consume error: %v", err)
